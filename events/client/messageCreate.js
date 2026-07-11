@@ -9,14 +9,29 @@ module.exports = async (client, message) => {
   const commandName = args.shift()?.toLowerCase();
   if (!commandName) return;
 
-  // Securite : prefixCommands peut ne pas exister si index.js pas a jour
-  if (!client.prefixCommands) {
-    client.prefixCommands = new Map();
-  }
+  if (!client.prefixCommands) client.prefixCommands = new Map();
 
-  const command =
+  // Cherche d'abord dans les prefix commands
+  let command =
     client.prefixCommands.get(commandName) ||
     [...client.prefixCommands.values()].find(c => c.aliases?.includes(commandName));
+
+  // Fallback : cherche dans les slash commands par nom
+  if (!command) {
+    const slashCmd = client.commands?.get(commandName);
+    if (slashCmd) {
+      // Wrapper : on cree un faux objet prefix autour de la slash command
+      command = {
+        name: slashCmd.data.name,
+        run: async (client, message, args) => {
+          return message.reply(
+            `\`${prefix}${commandName}\` est une **slash command**.\n` +
+            `Utilise \`/${commandName}\` dans Discord directement.`
+          );
+        }
+      };
+    }
+  }
 
   if (!command) return;
 
