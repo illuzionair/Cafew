@@ -17,23 +17,28 @@ const COUNTER_TYPES = [
   { key: 'roles',    label: '🏷️ Rôles',      template: '🏷️ Rôles : {count}' },
 ];
 
+async function getCount(guild, key) {
+  switch (key) {
+    case 'members':  return guild.memberCount;
+    case 'channels': return guild.channels.cache.size;
+    case 'roles':    return guild.roles.cache.size;
+    // Pour bots/humans/vocal on a besoin du cache members
+    case 'bots':     return guild.members.cache.filter(m => m.user.bot).size;
+    case 'humans':   return guild.members.cache.filter(m => !m.user.bot).size;
+    case 'vocal':    return guild.members.cache.filter(m => m.voice.channelId).size;
+    default:         return 0;
+  }
+}
+
 async function updateCounter(guild, key, db) {
   const chId = await db.get(`counter_${key}_${guild.id}`);
   if (!chId) return;
   const ch = guild.channels.cache.get(chId);
   if (!ch) return;
-  let count = 0;
-  switch (key) {
-    case 'members':  count = guild.memberCount; break;
-    case 'bots':     count = guild.members.cache.filter(m => m.user.bot).size; break;
-    case 'humans':   count = guild.members.cache.filter(m => !m.user.bot).size; break;
-    case 'vocal':    count = guild.members.cache.filter(m => m.voice.channelId).size; break;
-    case 'channels': count = guild.channels.cache.size; break;
-    case 'roles':    count = guild.roles.cache.size; break;
-  }
-  const tmpl = await db.get(`counter_${key}_template_${guild.id}`) || COUNTER_TYPES.find(t => t.key === key).template;
-  const name = tmpl.replace('{count}', count);
-  await ch.setName(name).catch(() => {});
+  const count = await getCount(guild, key);
+  const tmpl = await db.get(`counter_${key}_template_${guild.id}`) ||
+    COUNTER_TYPES.find(t => t.key === key).template;
+  await ch.setName(tmpl.replace('{count}', count)).catch(() => {});
 }
 
 module.exports = {
@@ -65,12 +70,12 @@ module.exports = {
 
     const sub = interaction.options.getSubcommand();
     const guild = interaction.guild;
-    await guild.members.fetch();
 
     if (sub === 'set') {
-      const key = interaction.options.getString('type');
-      const ch  = interaction.options.getChannel('salon');
+      const key  = interaction.options.getString('type');
+      const ch   = interaction.options.getChannel('salon');
       const tmpl = interaction.options.getString('template');
+      if (!ch) return interaction.reply({ content: 'Salon introuvable. Mentionne un salon vocal.', ephemeral: true });
       await db.set(`counter_${key}_${guild.id}`, ch.id);
       if (tmpl) await db.set(`counter_${key}_template_${guild.id}`, tmpl);
       await updateCounter(guild, key, db);
@@ -93,7 +98,10 @@ module.exports = {
         lines.push(`${t.label}: ${ch ? `<#${ch.id}>` : ':x:'}`);
       }
       return interaction.editReply({ embeds: [
-        new EmbedBuilder().setTitle('Compteurs actifs').setColor(interaction.client.config.color).setDescription(lines.join('\n'))
+        new EmbedBuilder()
+          .setTitle('Compteurs actifs')
+          .setColor(interaction.client.config.color)
+          .setDescription(lines.join('\n'))
       ]});
     }
 

@@ -27,28 +27,35 @@ function parseOptions(args, data) {
   return { opts, subcommand };
 }
 
-async function resolveMember(guild, val) {
-  if (!val) return null;
-  const id = val.replace(/[<@!>]/g, '');
-  if (!/^\d+$/.test(id)) return null;
-  return guild.members.fetch(id).catch(() => null);
+// Retourne true UNIQUEMENT si val est une vraie mention/ID Discord
+function isMention(val) {
+  if (!val) return false;
+  return /^<@!?\d{17,20}>$/.test(val) || /^\d{17,20}$/.test(val);
+}
+function isRoleMention(val) {
+  if (!val) return false;
+  return /^<@&\d{17,20}>$/.test(val);
+}
+function isChannelMention(val) {
+  if (!val) return false;
+  return /^<#\d{17,20}>$/.test(val);
 }
 
-async function resolveUser(guild, val) {
-  const member = await resolveMember(guild, val);
-  return member?.user ?? null;
+async function resolveMember(guild, val) {
+  if (!isMention(val)) return null;
+  const id = val.replace(/[<@!>]/g, '');
+  return guild.members.fetch(id).catch(() => null); // fetch UN membre, pas tous
 }
 
 function resolveChannel(guild, val) {
-  if (!val) return null;
+  if (!isChannelMention(val)) return null;
   const id = val.replace(/[<#>]/g, '');
   return guild.channels.cache.get(id) ?? null;
 }
 
 function resolveRole(guild, val) {
-  if (!val) return null;
+  if (!isRoleMention(val)) return null;
   const id = val.replace(/[<@&>]/g, '');
-  if (!/^\d+$/.test(id)) return null;
   return guild.roles.cache.get(id) ?? null;
 }
 
@@ -59,7 +66,6 @@ async function createFakeInteraction(message, args, slashCmd) {
     data?.options ? { options: data.options.map(o => o.toJSON ? o.toJSON() : o) } : {}
   );
   const guild = message.guild;
-
   const resolved = { ...opts };
 
   let replied  = false;
@@ -80,19 +86,18 @@ async function createFakeInteraction(message, args, slashCmd) {
     createdTimestamp: message.createdTimestamp,
 
     options: {
-      _opts:       resolved,
-      _subcommand: subcommand,
-      _cache:      {},
+      _opts:         resolved,
+      _subcommand:   subcommand,
+      _cache:        {},
       getSubcommand: () => subcommand,
-      getString:   (name) => resolved[name] ?? null,
-      getInteger:  (name) => resolved[name] != null ? parseInt(resolved[name])   : null,
-      getNumber:   (name) => resolved[name] != null ? parseFloat(resolved[name]) : null,
-      getBoolean:  (name) => resolved[name] === 'true' || resolved[name] === 'oui',
-      // Versions sync — remplacées après le cache
-      getMember:  (name) => null,
-      getUser:    (name) => null,
-      getChannel: (name) => null,
-      getRole:    (name) => null,
+      getString:     (name) => resolved[name] ?? null,
+      getInteger:    (name) => resolved[name] != null ? parseInt(resolved[name])   : null,
+      getNumber:     (name) => resolved[name] != null ? parseFloat(resolved[name]) : null,
+      getBoolean:    (name) => resolved[name] === 'true' || resolved[name] === 'oui',
+      getMember:     (name) => null,
+      getUser:       (name) => null,
+      getChannel:    (name) => null,
+      getRole:       (name) => null,
     },
 
     isChatInputCommand: () => true,
@@ -146,12 +151,11 @@ async function createFakeInteraction(message, args, slashCmd) {
     },
   };
 
-  // ── Pré-résolution asynchrone de toutes les options ──
+  // ── Pré-résolution : uniquement si val est une vraie mention ──
   for (const [key, val] of Object.entries(resolved)) {
     if (!val) continue;
 
-    // Membre / User  —  <@id>, <@!id>, ou id brut
-    if (/^(<@!?\d+>|\d{17,20})$/.test(val)) {
+    if (isMention(val)) {
       const member = await resolveMember(guild, val).catch(() => null);
       if (member) {
         fakeInteraction.options._cache[key]           = { member, user: member.user };
@@ -159,25 +163,23 @@ async function createFakeInteraction(message, args, slashCmd) {
       }
     }
 
-    // Channel  —  <#id>
-    if (val.startsWith('<#')) {
+    if (isChannelMention(val)) {
       const ch = resolveChannel(guild, val);
       if (ch) fakeInteraction.options._cache[key + '_ch'] = ch;
     }
 
-    // Role  —  <@&id> ou id brut précédé de @&
-    if (/^<@&\d+>$/.test(val) || /^\d{17,20}$/.test(val)) {
+    if (isRoleMention(val)) {
       const role = resolveRole(guild, val);
       if (role) fakeInteraction.options._cache[key + '_role'] = role;
     }
   }
 
   // ── Accesseurs sync finaux ──
-  fakeInteraction.options.getMember  = (name) => fakeInteraction.options._cache[name]?.member    ?? null;
-  fakeInteraction.options.getUser    = (name) => fakeInteraction.options._cache[name + '_user']  ??
-                                                  fakeInteraction.options._cache[name]?.user      ?? null;
-  fakeInteraction.options.getChannel = (name) => fakeInteraction.options._cache[name + '_ch']    ?? null;
-  fakeInteraction.options.getRole    = (name) => fakeInteraction.options._cache[name + '_role']  ?? null;
+  fakeInteraction.options.getMember  = (name) => fakeInteraction.options._cache[name]?.member   ?? null;
+  fakeInteraction.options.getUser    = (name) => fakeInteraction.options._cache[name + '_user'] ??
+                                                  fakeInteraction.options._cache[name]?.user     ?? null;
+  fakeInteraction.options.getChannel = (name) => fakeInteraction.options._cache[name + '_ch']   ?? null;
+  fakeInteraction.options.getRole    = (name) => fakeInteraction.options._cache[name + '_role'] ?? null;
 
   return fakeInteraction;
 }
