@@ -2,6 +2,7 @@
   "prefix": "!",
   "color": "#5865F2",
   "name": "Cafew",
+  "owner": [],
   "xpPerMessage": { "min": 15, "max": 25 },
   "xpPerLevel": 500,
   "grades": [
