@@ -21,17 +21,10 @@ function loadCategories() {
     for (const file of files) {
       try {
         const cmd = require(path.join(baseDir, folder, file));
-        if (cmd.data) {
-          cmds.push({
-            name: cmd.data.name,
-            description: cmd.data.description || 'Aucune description.',
-          });
-        }
+        if (cmd.data) cmds.push({ name: cmd.data.name, description: cmd.data.description || 'Aucune description.' });
       } catch {}
     }
-    if (cmds.length > 0) {
-      categories.push({ name: folder, cmds });
-    }
+    if (cmds.length > 0) categories.push({ name: folder, cmds });
   }
   return categories;
 }
@@ -40,11 +33,7 @@ function buildEmbed(categories, page, prefix, config) {
   const cat = categories[page];
   const icon = CATEGORY_ICONS[cat.name] || '📁';
   const total = categories.reduce((acc, c) => acc + c.cmds.length, 0);
-
-  const lines = cat.cmds.map(c =>
-    `\`${prefix}${c.name}\` — ${c.description}`
-  ).join('\n');
-
+  const lines = cat.cmds.map(c => `\`${prefix}${c.name}\` — ${c.description}`).join('\n');
   return new EmbedBuilder()
     .setTitle(`${icon} Commandes — ${cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}`)
     .setDescription(lines)
@@ -55,16 +44,8 @@ function buildEmbed(categories, page, prefix, config) {
 
 function buildRow(page, total) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('prev')
-      .setLabel('◀ Précédent')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(page === 0),
-    new ButtonBuilder()
-      .setCustomId('next')
-      .setLabel('Suivant ▶')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(page === total - 1),
+    new ButtonBuilder().setCustomId('cmds_prev').setLabel('◀ Précédent').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+    new ButtonBuilder().setCustomId('cmds_next').setLabel('Suivant ▶').setStyle(ButtonStyle.Secondary).setDisabled(page === total - 1),
   );
 }
 
@@ -77,45 +58,42 @@ module.exports = {
     const config = interaction.client.config;
     const prefix = config.prefix || '+';
     const categories = loadCategories();
-    if (categories.length === 0) {
-      return interaction.reply({ content: 'Aucune commande trouvée.', ephemeral: true });
-    }
+    if (categories.length === 0) return interaction.reply({ content: 'Aucune commande trouvée.', ephemeral: true });
 
     let page = 0;
+    const authorId = interaction.user?.id ?? interaction.member?.user?.id;
 
-    const embed = buildEmbed(categories, page, prefix, config);
-    const row   = buildRow(page, categories.length);
+    // Le bridge retourne le Message directement, la vraie slash retourne undefined
+    const sent = await interaction.reply({
+      embeds: [buildEmbed(categories, page, prefix, config)],
+      components: [buildRow(page, categories.length)]
+    });
 
-    const isReal = typeof interaction.deferReply === 'function' && !interaction._isFake;
-    let msg;
-    if (isReal) {
-      await interaction.reply({ embeds: [embed], components: [row] });
+    let msg = (sent && sent.createMessageComponentCollector) ? sent : null;
+    if (!msg && typeof interaction.fetchReply === 'function') {
       msg = await interaction.fetchReply().catch(() => null);
-    } else {
-      msg = await interaction.reply({ embeds: [embed], components: [row] });
     }
-
     if (!msg) return;
 
     const collector = msg.createMessageComponentCollector({
       componentType: ComponentType.Button,
       time: 120_000,
-      filter: (btn) => btn.user?.id === (interaction.user?.id || interaction.member?.user?.id),
+      filter: (btn) => (btn.user?.id ?? btn.member?.user?.id) === authorId,
     });
 
     collector.on('collect', async (btn) => {
-      if (btn.customId === 'prev' && page > 0) page--;
-      if (btn.customId === 'next' && page < categories.length - 1) page++;
+      if (btn.customId === 'cmds_prev' && page > 0) page--;
+      if (btn.customId === 'cmds_next' && page < categories.length - 1) page++;
       await btn.update({
         embeds: [buildEmbed(categories, page, prefix, config)],
-        components: [buildRow(page, categories.length)],
+        components: [buildRow(page, categories.length)]
       }).catch(() => {});
     });
 
     collector.on('end', () => {
       const disabledRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('prev').setLabel('◀ Précédent').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('next').setLabel('Suivant ▶').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('cmds_prev').setLabel('◀ Précédent').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('cmds_next').setLabel('Suivant ▶').setStyle(ButtonStyle.Secondary).setDisabled(true),
       );
       msg.edit({ components: [disabledRow] }).catch(() => {});
     });
