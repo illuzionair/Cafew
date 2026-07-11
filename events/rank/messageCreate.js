@@ -1,7 +1,7 @@
 const { QuickDB } = require('quick.db');
 const { AttachmentBuilder } = require('discord.js');
 const { addXp, getGrade } = require('../../util/levelSystem');
-const { generateRankCard } = require('../../util/canvas/rankCard');
+const { generateLevelUpCard } = require('../../util/canvas/levelUpCard');
 const db = new QuickDB();
 
 const cooldowns = new Map();
@@ -22,15 +22,16 @@ module.exports = async (client, message) => {
   if (!levelUp) return;
 
   const grade = getGrade(newLevel, client.config);
+
+  // Attribution du rôle de grade
   if (grade && grade.roleId) {
     const role = message.guild.roles.cache.get(grade.roleId);
     if (role && !message.member.roles.cache.has(role.id)) {
       message.member.roles.add(role).catch(() => {});
       const oldGrades = client.config.grades.filter(g => g.roleId && g.roleId !== grade.roleId);
       for (const g of oldGrades) {
-        if (message.member.roles.cache.has(g.roleId)) {
+        if (message.member.roles.cache.has(g.roleId))
           message.member.roles.remove(g.roleId).catch(() => {});
-        }
       }
     }
   }
@@ -40,11 +41,7 @@ module.exports = async (client, message) => {
   if (!channel) return;
 
   try {
-    const allLevels = await db.startsWith(`level_${guildId}_`);
-    const sorted = allLevels.sort((a, b) => b.value - a.value);
-    const rank = sorted.findIndex(e => e.id === `level_${guildId}_${userId}`) + 1;
-    const userData = { level: newLevel, xp: newXp, xpNeeded, grade };
-    const buffer = await generateRankCard(message.member, userData, rank || 1);
+    const buffer = await generateLevelUpCard(message.member, newLevel, grade);
     const attachment = new AttachmentBuilder(buffer, { name: 'levelup.png' });
     const msg = client.config.levelMessage
       .replace('{user}', `<@${userId}>`)
@@ -54,5 +51,12 @@ module.exports = async (client, message) => {
     channel.send({ content: msg, files: [attachment] });
   } catch (err) {
     console.error('[LEVELUP]', err);
+    channel.send(
+      client.config.levelMessage
+        .replace('{user}', `<@${userId}>`)
+        .replace('{username}', message.author.username)
+        .replace('{level}', newLevel)
+        .replace('{grade}', grade.name)
+    );
   }
 };
