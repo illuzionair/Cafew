@@ -1,31 +1,24 @@
 module.exports = async (client, message) => {
-  // DEBUG — retire ces lignes une fois que ca marche
-  if (!message.author.bot && message.guild) {
-    console.log(`[MSG] "${message.content.substring(0,50)}" de ${message.author.tag}`);
-  }
-
   if (message.author.bot) return;
   if (!message.guild) return;
 
-  const prefix = client.config.prefix;
-
-  if (!message.content.startsWith(prefix)) return;
-
-  console.log(`[PREFIX DETECTE] ${message.content}`);
-  console.log(`[PREFIX] prefixCommands enregistrees: ${[...client.prefixCommands.keys()].join(', ') || 'AUCUNE'}`);
+  const prefix = client.config?.prefix;
+  if (!prefix || !message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
-  const commandName = args.shift().toLowerCase();
+  const commandName = args.shift()?.toLowerCase();
   if (!commandName) return;
 
-  const command =
-    client.prefixCommands?.get(commandName) ||
-    client.prefixCommands?.find(c => c.aliases && c.aliases.includes(commandName));
-
-  if (!command) {
-    console.log(`[PREFIX] "${commandName}" introuvable. prefixCommands size: ${client.prefixCommands.size}`);
-    return;
+  // Securite : prefixCommands peut ne pas exister si index.js pas a jour
+  if (!client.prefixCommands) {
+    client.prefixCommands = new Map();
   }
+
+  const command =
+    client.prefixCommands.get(commandName) ||
+    [...client.prefixCommands.values()].find(c => c.aliases?.includes(commandName));
+
+  if (!command) return;
 
   if (!client.cooldowns) client.cooldowns = new Map();
   const now = Date.now();
