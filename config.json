@@ -1,0 +1,17 @@
+{
+  "prefix": "!",
+  "color": "#5865F2",
+  "name": "Cafew",
+  "xpPerMessage": { "min": 15, "max": 25 },
+  "xpPerLevel": 500,
+  "grades": [
+    { "name": "Novice",   "minLevel": 1,  "color": "#95a5a6", "roleId": null },
+    { "name": "Bronze",   "minLevel": 5,  "color": "#cd7f32", "roleId": null },
+    { "name": "Argent",   "minLevel": 15, "color": "#bdc3c7", "roleId": null },
+    { "name": "Or",       "minLevel": 30, "color": "#f1c40f", "roleId": null },
+    { "name": "Diamant",  "minLevel": 50, "color": "#1abc9c", "roleId": null }
+  ],
+  "welcomeMessage": "Bienvenue sur le serveur, {user} !",
+  "leaveMessage": "{username} vient de quitter le serveur.",
+  "levelMessage": "{user} vient de passer au niveau **{level}** ! Grade : **{grade}**"
+}

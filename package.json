@@ -1,0 +1,20 @@
+{
+  "name": "cafew",
+  "version": "1.0.0",
+  "description": "Bot Discord Cafew - discord.js v14",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "author": "illuzionAir",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.44",
+    "@discordjs/rest": "^2.3.0",
+    "discord-api-types": "^0.37.83",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.3.1",
+    "quick.db": "^9.1.7"
+  }
+}
