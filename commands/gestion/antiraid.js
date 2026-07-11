@@ -89,11 +89,18 @@ async function applyPreset(guildId, preset) {
     'crealimit','antideco','link'];
   for (const key of mods) {
     if (preset === 'off') {
-      await db.set(`${key}_${guildId}`, null);
+      // quick.db n'accepte pas null — on supprime les clés
+      await db.delete(`${key}_${guildId}`);
+      await db.delete(`${key}sanction_${guildId}`);
+      await db.delete(`${key}wl_${guildId}`);
     } else {
       await db.set(`${key}_${guildId}`, true);
       await db.set(`${key}sanction_${guildId}`, preset === 'max' ? 'ban' : 'derank');
-      await db.set(`${key}wl_${guildId}`, preset === 'max' ? true : null);
+      if (preset === 'max') {
+        await db.set(`${key}wl_${guildId}`, true);
+      } else {
+        await db.delete(`${key}wl_${guildId}`);
+      }
     }
   }
 }
@@ -118,8 +125,6 @@ module.exports = {
     let page = 1;
 
     const embed = await buildPageEmbed(guildId, page, interaction.client);
-
-    // reply() en slash réelle retourne undefined → on appelle fetchReply()
     const sent = await interaction.reply({
       embeds: [embed],
       components: buildActionRow(page, guildId),
@@ -179,10 +184,23 @@ module.exports = {
         const sanc   = submit.fields.getTextInputValue('sanction').toLowerCase().trim();
         const bypass = submit.fields.getTextInputValue('wlbypass').toLowerCase().trim();
 
-        await db.set(`${key}_${guildId}`, actif === 'oui' ? true : null);
+        // Actif
+        if (actif === 'oui') {
+          await db.set(`${key}_${guildId}`, true);
+        } else {
+          await db.delete(`${key}_${guildId}`);
+        }
+
+        // Sanction
         if (['ban','kick','derank'].includes(sanc))
           await db.set(`${key}sanction_${guildId}`, sanc);
-        await db.set(`${key}wl_${guildId}`, bypass === 'non' ? true : null);
+
+        // WL bypass
+        if (bypass === 'non') {
+          await db.set(`${key}wl_${guildId}`, true);
+        } else {
+          await db.delete(`${key}wl_${guildId}`);
+        }
 
         const updEmbed = await buildPageEmbed(guildId, page, interaction.client);
         await submit.update({ embeds: [updEmbed], components: buildActionRow(page, guildId) });
