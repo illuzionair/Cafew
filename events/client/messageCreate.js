@@ -1,22 +1,32 @@
 module.exports = async (client, message) => {
+  // DEBUG — retire ces lignes une fois que ca marche
+  if (!message.author.bot && message.guild) {
+    console.log(`[MSG] "${message.content.substring(0,50)}" de ${message.author.tag}`);
+  }
+
   if (message.author.bot) return;
   if (!message.guild) return;
 
   const prefix = client.config.prefix;
+
   if (!message.content.startsWith(prefix)) return;
+
+  console.log(`[PREFIX DETECTE] ${message.content}`);
+  console.log(`[PREFIX] prefixCommands enregistrees: ${[...client.prefixCommands.keys()].join(', ') || 'AUCUNE'}`);
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const commandName = args.shift().toLowerCase();
   if (!commandName) return;
 
-  // Cherche dans les prefix commands (legacy)
   const command =
     client.prefixCommands?.get(commandName) ||
     client.prefixCommands?.find(c => c.aliases && c.aliases.includes(commandName));
 
-  if (!command) return;
+  if (!command) {
+    console.log(`[PREFIX] "${commandName}" introuvable. prefixCommands size: ${client.prefixCommands.size}`);
+    return;
+  }
 
-  // Cooldown basique
   if (!client.cooldowns) client.cooldowns = new Map();
   const now = Date.now();
   const cooldownKey = `${command.name}_${message.author.id}`;
@@ -25,7 +35,7 @@ module.exports = async (client, message) => {
     const expire = client.cooldowns.get(cooldownKey) + cooldown;
     if (now < expire) {
       const left = ((expire - now) / 1000).toFixed(1);
-      return message.reply(`⏳ Attends encore **${left}s** avant de réutiliser cette commande.`)
+      return message.reply(`⏳ Attends encore **${left}s**.`)
         .then(m => setTimeout(() => m.delete().catch(() => {}), 4000));
     }
   }
@@ -36,6 +46,6 @@ module.exports = async (client, message) => {
     await command.run(client, message, args, prefix, client.config.color);
   } catch (err) {
     console.error(`[PREFIX CMD ERROR] ${command.name}:`, err);
-    message.reply('❌ Une erreur est survenue lors de l’exécution de cette commande.').catch(() => {});
+    message.reply('❌ Une erreur est survenue.').catch(() => {});
   }
 };
