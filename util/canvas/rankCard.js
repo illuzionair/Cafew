@@ -1,13 +1,14 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const C = {
-  bg1:  '#2C1A0E',
-  bg2:  '#3D2410',
-  bar:  '#4A2E14',
-  text: '#F5E6C8',
-  sub:  '#D4B483',
-  muted:'#9E7D55',
-  gold: '#C8922A',
+  bg1:    '#2C1A0E',
+  bg2:    '#3D2410',
+  bar:    '#4A2E14',
+  text:   '#F5E6C8',
+  sub:    '#D4B483',
+  muted:  '#9E7D55',
+  gold:   '#C8922A',
+  border: '#C8922A',
 };
 
 async function generateRankCard(member, userData, rank) {
@@ -25,18 +26,12 @@ async function generateRankCard(member, userData, rank) {
   ctx.roundRect(0, 0, W, H, 16);
   ctx.fill();
 
-  // Bordure couleur grade
-  ctx.strokeStyle = grade.color;
+  // Bordure or café (pas grade.color)
+  ctx.strokeStyle = C.border;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.roundRect(2, 2, W - 4, H - 4, 14);
   ctx.stroke();
-
-  // Barre latérale grade
-  ctx.fillStyle = grade.color;
-  ctx.beginPath();
-  ctx.roundRect(0, 0, 6, H, [16, 0, 0, 16]);
-  ctx.fill();
 
   // Avatar
   const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
@@ -49,24 +44,25 @@ async function generateRankCard(member, userData, rank) {
   ctx.drawImage(avatar, 45, 56, 170, 170);
   ctx.restore();
 
-  ctx.strokeStyle = grade.color;
+  // Anneau avatar or
+  ctx.strokeStyle = C.gold;
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.arc(130, 141, 87, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Badge grade
+  // Badge grade (couleur grade gardée pour varier visuellement)
   const badgeText = grade.name;
   ctx.font = 'bold 13px sans-serif';
   const bw = ctx.measureText(badgeText).width + 22;
-  ctx.fillStyle = grade.color;
+  ctx.fillStyle = C.gold;
   ctx.beginPath();
   ctx.roundRect(45, 202, bw, 26, 8);
   ctx.fill();
   ctx.fillStyle = '#1A0A00';
   ctx.fillText(badgeText, 56, 220);
 
-  // Séparateur
+  // Séparateur vertical
   ctx.strokeStyle = C.gold + '44';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -84,8 +80,8 @@ async function generateRankCard(member, userData, rank) {
   ctx.font = '20px sans-serif';
   ctx.fillText(`Rang #${rank}`, 270, 112);
 
-  // Niveau (coin haut droit)
-  ctx.fillStyle = grade.color;
+  // Niveau coin haut droit
+  ctx.fillStyle = C.gold;
   ctx.font = 'bold 22px sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText(`NIVEAU ${level}`, W - 30, 50);
@@ -102,11 +98,12 @@ async function generateRankCard(member, userData, rank) {
   ctx.roundRect(270, 162, 620, 28, 14);
   ctx.fill();
 
-  // Barre XP remplie
+  // Barre XP remplie — dégradé café chaud, pas grade.color
   const progress = Math.min(xp / xpNeeded, 1);
   const barGrad = ctx.createLinearGradient(270, 0, 890, 0);
-  barGrad.addColorStop(0, grade.color);
-  barGrad.addColorStop(1, C.gold);
+  barGrad.addColorStop(0, '#8B4513');  // brun selle
+  barGrad.addColorStop(0.5, '#C8922A'); // or café
+  barGrad.addColorStop(1,   '#E8B84B'); // or clair
   ctx.fillStyle = barGrad;
   ctx.beginPath();
   ctx.roundRect(270, 162, Math.max(progress * 620, 28), 28, 14);
@@ -126,10 +123,10 @@ async function generateRankCard(member, userData, rank) {
 
   // Ligne déco bas
   const deco = ctx.createLinearGradient(270, 0, 890, 0);
-  deco.addColorStop(0, grade.color);
+  deco.addColorStop(0, C.gold);
   deco.addColorStop(1, 'transparent');
   ctx.fillStyle = deco;
-  ctx.fillRect(270, 240, 600, 2);
+  ctx.fillRect(270, 248, 600, 2);
 
   return canvas.toBuffer('image/png');
 }
