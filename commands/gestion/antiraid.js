@@ -19,33 +19,33 @@ const onoff = v => v === true ? '`✅`' : '`❌`';
 const wlbypass = v => v === true ? '`❌` (WL ignorée)' : '`✅` (WL bypass)';
 
 const MODULES = [
-  { key: 'webhook',      label: 'Création de webhook',                    page: 1 },
-  { key: 'rolescreate',  label: 'Création de rôle',                       page: 1 },
-  { key: 'rolesmod',     label: 'Modification de rôle',                   page: 1 },
-  { key: 'rolesdel',     label: 'Suppression de rôle',                    page: 1 },
-  { key: 'rolesadd',     label: 'Ajout de perm dangereuse à un rôle',     page: 1 },
-  { key: 'update',       label: 'Modification du serveur',                page: 2 },
-  { key: 'channelscreate', label: 'Création de salon',                    page: 2 },
-  { key: 'channelsmod',  label: 'Modification de salon',                  page: 2 },
-  { key: 'channelsdel',  label: 'Suppression de salon',                   page: 2 },
-  { key: 'bot',          label: 'Ajout de bot',                           page: 2 },
-  { key: 'massban',      label: 'Bannissement de membre',                 page: 3 },
-  { key: 'antitoken',    label: 'Anti mass-join',                         page: 3 },
-  { key: 'crealimit',    label: 'Compte trop récent (anti-token)',        page: 3 },
-  { key: 'antideco',     label: 'Déconnexion de membre',                  page: 3 },
-  { key: 'link',         label: 'Anti-lien',                              page: 3 },
+  { key: 'webhook',        label: 'Création de webhook',               page: 1 },
+  { key: 'rolescreate',    label: 'Création de rôle',                  page: 1 },
+  { key: 'rolesmod',       label: 'Modification de rôle',              page: 1 },
+  { key: 'rolesdel',       label: 'Suppression de rôle',               page: 1 },
+  { key: 'rolesadd',       label: 'Ajout de perm dangereuse à un rôle', page: 1 },
+  { key: 'update',         label: 'Modification du serveur',           page: 2 },
+  { key: 'channelscreate', label: 'Création de salon',                 page: 2 },
+  { key: 'channelsmod',    label: 'Modification de salon',             page: 2 },
+  { key: 'channelsdel',    label: 'Suppression de salon',              page: 2 },
+  { key: 'bot',            label: 'Ajout de bot',                      page: 2 },
+  { key: 'massban',        label: 'Bannissement de membre',            page: 3 },
+  { key: 'antitoken',      label: 'Anti mass-join',                    page: 3 },
+  { key: 'crealimit',      label: 'Compte trop récent (anti-token)',   page: 3 },
+  { key: 'antideco',       label: 'Déconnexion de membre',             page: 3 },
+  { key: 'link',           label: 'Anti-lien',                         page: 3 },
 ];
 
 async function getModuleData(guildId, key) {
-  const active  = await db.get(`${key}_${guildId}`);
-  const sanc    = await db.get(`${key}sanction_${guildId}`) || 'derank';
-  const wl      = await db.get(`${key}wl_${guildId}`);
+  const active = await db.get(`${key}_${guildId}`);
+  const sanc   = await db.get(`${key}sanction_${guildId}`) || 'derank';
+  const wl     = await db.get(`${key}wl_${guildId}`);
   return { active, sanc, wl };
 }
 
 async function buildPageEmbed(guildId, page, client) {
   const color = client.config.color;
-  const mods = MODULES.filter(m => m.page === page);
+  const mods  = MODULES.filter(m => m.page === page);
   const lines = [];
   for (const mod of mods) {
     const d = await getModuleData(guildId, mod.key);
@@ -69,24 +69,21 @@ function buildModuleSelect(page, guildId) {
 }
 
 function buildActionRow(page, guildId) {
-  const rows = [];
-  rows.push(new ActionRowBuilder().addComponents(buildModuleSelect(page, guildId)));
-  const navBtns = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`ar_prev_${guildId}`).setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page === 1),
-    new ButtonBuilder().setCustomId(`ar_next_${guildId}`).setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page === 3),
-  );
-  const actionBtns = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`ar_on_${guildId}`).setLabel('Tout activer').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`ar_off_${guildId}`).setLabel('Tout désactiver').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`ar_max_${guildId}`).setLabel('Mode MAX').setStyle(ButtonStyle.Success),
-  );
-  rows.push(navBtns);
-  rows.push(actionBtns);
-  return rows;
+  return [
+    new ActionRowBuilder().addComponents(buildModuleSelect(page, guildId)),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ar_prev_${guildId}`).setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page === 1),
+      new ButtonBuilder().setCustomId(`ar_next_${guildId}`).setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page === 3),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ar_on_${guildId}`).setLabel('Tout activer').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`ar_off_${guildId}`).setLabel('Tout désactiver').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`ar_max_${guildId}`).setLabel('Mode MAX').setStyle(ButtonStyle.Success),
+    ),
+  ];
 }
 
 async function applyPreset(guildId, preset) {
-  const sanc = preset === 'max' ? 'ban' : 'ban';
   const mods = ['webhook','rolescreate','rolesmod','rolesdel','rolesadd','update',
     'channelscreate','channelsmod','channelsdel','bot','massban','antitoken',
     'crealimit','antideco','link'];
@@ -108,6 +105,11 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
+    // Les modaux Discord ne fonctionnent qu'en slash — bloque le prefix
+    if (!interaction.isChatInputCommand || !interaction.isChatInputCommand()) {
+      return interaction.reply({ content: '⚠️ Cette commande utilise des formulaires interactifs. Utilise `/antiraid` (slash command) à la place.' });
+    }
+
     if (!await isOwnerBot(interaction.client, interaction.user.id)) {
       return interaction.reply({ content: 'Tu dois être owner bot pour utiliser cette commande.', ephemeral: true });
     }
@@ -116,31 +118,34 @@ module.exports = {
     let page = 1;
 
     const embed = await buildPageEmbed(guildId, page, interaction.client);
-    const msg = await interaction.reply({
+
+    // reply() en slash réelle retourne undefined → on appelle fetchReply()
+    const sent = await interaction.reply({
       embeds: [embed],
       components: buildActionRow(page, guildId),
-      fetchReply: true
     });
+
+    let msg = (sent && sent.createMessageComponentCollector) ? sent : null;
+    if (!msg && typeof interaction.fetchReply === 'function') {
+      msg = await interaction.fetchReply().catch(() => null);
+    }
+    if (!msg) return;
 
     const collector = msg.createMessageComponentCollector({ time: 10 * 60 * 1000 });
 
     collector.on('collect', async inter => {
-      if (inter.user.id !== interaction.user.id) return inter.reply({ content: 'Pas pour toi.', ephemeral: true });
+      if (inter.user.id !== interaction.user.id)
+        return inter.reply({ content: 'Pas pour toi.', ephemeral: true });
 
-      // Navigation
-      if (inter.customId === `ar_prev_${guildId}` && page > 1) { page--; }
-      else if (inter.customId === `ar_next_${guildId}` && page < 3) { page++; }
-
-      // Présets
-      else if (inter.customId === `ar_on_${guildId}`)  { await applyPreset(guildId, 'on');  }
-      else if (inter.customId === `ar_off_${guildId}`) { await applyPreset(guildId, 'off'); }
-      else if (inter.customId === `ar_max_${guildId}`) { await applyPreset(guildId, 'max'); }
-
-      // Config module via select
+      if      (inter.customId === `ar_prev_${guildId}` && page > 1)  page--;
+      else if (inter.customId === `ar_next_${guildId}` && page < 3)  page++;
+      else if (inter.customId === `ar_on_${guildId}`)  await applyPreset(guildId, 'on');
+      else if (inter.customId === `ar_off_${guildId}`) await applyPreset(guildId, 'off');
+      else if (inter.customId === `ar_max_${guildId}`) await applyPreset(guildId, 'max');
       else if (inter.customId === `antiraid_mod_${guildId}`) {
         const key = inter.values[0];
         const mod = MODULES.find(m => m.key === key);
-        const d = await getModuleData(guildId, key);
+        const d   = await getModuleData(guildId, key);
 
         const modal = new ModalBuilder()
           .setCustomId(`ar_modal_${key}_${guildId}`)
@@ -165,16 +170,18 @@ module.exports = {
               .setValue(d.wl === true ? 'non' : 'oui').setRequired(true)
           ),
         );
+
         await inter.showModal(modal);
-        const submit = await inter.awaitModalSubmit({ time: 60000 }).catch(() => null);
+        const submit = await inter.awaitModalSubmit({ time: 60_000 }).catch(() => null);
         if (!submit) return;
 
         const actif  = submit.fields.getTextInputValue('actif').toLowerCase().trim();
         const sanc   = submit.fields.getTextInputValue('sanction').toLowerCase().trim();
-        const bypass  = submit.fields.getTextInputValue('wlbypass').toLowerCase().trim();
+        const bypass = submit.fields.getTextInputValue('wlbypass').toLowerCase().trim();
 
         await db.set(`${key}_${guildId}`, actif === 'oui' ? true : null);
-        if (['ban','kick','derank'].includes(sanc)) await db.set(`${key}sanction_${guildId}`, sanc);
+        if (['ban','kick','derank'].includes(sanc))
+          await db.set(`${key}sanction_${guildId}`, sanc);
         await db.set(`${key}wl_${guildId}`, bypass === 'non' ? true : null);
 
         const updEmbed = await buildPageEmbed(guildId, page, interaction.client);
