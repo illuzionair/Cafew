@@ -10,35 +10,66 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.GuildBans,
+    GatewayIntentBits.GuildWebhooks,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
 
-client.commands = new Collection();
-client.config = require('./config.json');
+client.commands      = new Collection(); // slash commands
+client.prefixCommands = new Collection(); // prefix commands
+client.config        = require('./config.json');
 
-// Chargement des commandes
+// ── Chargement des slash commands ─────────────────────────────────────────
 const commandFolders = readdirSync('./commands');
 for (const folder of commandFolders) {
-  const commandFiles = readdirSync(`./commands/${folder}`).filter(f => f.endsWith('.js'));
-  for (const file of commandFiles) {
-    const command = require(`./commands/${folder}/${file}`);
-    if (command.data && command.execute) {
-      client.commands.set(command.data.name, command);
-      console.log(`[CMD] Charge: ${command.data.name}`);
+  const files = readdirSync(`./commands/${folder}`).filter(f => f.endsWith('.js'));
+  for (const file of files) {
+    const cmd = require(`./commands/${folder}/${file}`);
+    if (cmd.data && cmd.execute) {
+      client.commands.set(cmd.data.name, cmd);
+      console.log(`[SLASH] ${cmd.data.name}`);
+    } else if (cmd.name && cmd.run) {
+      // Legacy prefix command dans commands/
+      client.prefixCommands.set(cmd.name, cmd);
+      console.log(`[PREFIX] ${cmd.name}`);
     }
   }
 }
 
-// Chargement des events
+// ── Chargement des prefix commands dédiées (dossier commands/prefix/) ────
+// (optionnel, si tu crées ce dossier plus tard)
+
+// ── Chargement des events ─────────────────────────────────────────────────
+// Supporte deux formats :
+//   1. module.exports = async (client, ...args) => {}      (ancien format)
+//   2. module.exports = { name, execute, customName? }     (nouveau format antiraid)
 const eventFolders = readdirSync('./events');
+const registeredEvents = new Map(); // eventName -> count (pour debug)
+
 for (const folder of eventFolders) {
-  const eventFiles = readdirSync(`./events/${folder}`).filter(f => f.endsWith('.js'));
-  for (const file of eventFiles) {
+  const files = readdirSync(`./events/${folder}`).filter(f => f.endsWith('.js'));
+  for (const file of files) {
     const event = require(`./events/${folder}/${file}`);
-    const eventName = file.split('.')[0];
-    client.on(eventName, (...args) => event(client, ...args));
-    console.log(`[EVT] Charge: ${eventName} [${folder}]`);
+
+    if (typeof event === 'function') {
+      // Ancien format : nom = nom du fichier sans extension
+      const eventName = file.replace('.js', '');
+      client.on(eventName, (...args) => event(client, ...args));
+      const count = (registeredEvents.get(eventName) || 0) + 1;
+      registeredEvents.set(eventName, count);
+      console.log(`[EVT] ${eventName} [${folder}/${file}]`);
+
+    } else if (event && event.name && typeof event.execute === 'function') {
+      // Nouveau format objet { name, execute }
+      client.on(event.name, (...args) => event.execute(...args));
+      const label = event.customName || event.name;
+      const count = (registeredEvents.get(event.name) || 0) + 1;
+      registeredEvents.set(event.name, count);
+      console.log(`[EVT] ${event.name} [${folder}/${file}] (${label})`);
+    } else {
+      console.warn(`[EVT WARN] Format inconnu : ${folder}/${file}`);
+    }
   }
 }
 
