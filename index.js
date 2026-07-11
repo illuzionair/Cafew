@@ -12,13 +12,14 @@ const client = new Client({
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildBans,
     GatewayIntentBits.GuildWebhooks,
+    GatewayIntentBits.GuildModeration,
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
 });
 
-client.commands      = new Collection(); // slash commands
-client.prefixCommands = new Collection(); // prefix commands
-client.config        = require('./config.json');
+client.commands       = new Collection();
+client.prefixCommands = new Collection();
+client.config         = require('./config.json');
 
 // ── Chargement des slash commands ─────────────────────────────────────────
 const commandFolders = readdirSync('./commands');
@@ -30,45 +31,48 @@ for (const folder of commandFolders) {
       client.commands.set(cmd.data.name, cmd);
       console.log(`[SLASH] ${cmd.data.name}`);
     } else if (cmd.name && cmd.run) {
-      // Legacy prefix command dans commands/
       client.prefixCommands.set(cmd.name, cmd);
       console.log(`[PREFIX] ${cmd.name}`);
     }
   }
 }
 
-// ── Chargement des prefix commands dédiées (dossier commands/prefix/) ────
-// (optionnel, si tu crées ce dossier plus tard)
-
 // ── Chargement des events ─────────────────────────────────────────────────
-// Supporte deux formats :
-//   1. module.exports = async (client, ...args) => {}      (ancien format)
-//   2. module.exports = { name, execute, customName? }     (nouveau format antiraid)
-const eventFolders = readdirSync('./events');
-const registeredEvents = new Map(); // eventName -> count (pour debug)
+function registerEvent(event, source) {
+  if (typeof event === 'function') {
+    // Ancien format : nom = nom du fichier sans .js (passé en arg)
+    return; // géré séparément
+  }
+  if (event && event.name && typeof event.execute === 'function') {
+    client.on(event.name, (...args) => event.execute(...args));
+    const label = event.customName || event.name;
+    console.log(`[EVT] ${event.name} [${source}] (${label})`);
+  }
+}
 
+const eventFolders = readdirSync('./events');
 for (const folder of eventFolders) {
   const files = readdirSync(`./events/${folder}`).filter(f => f.endsWith('.js'));
   for (const file of files) {
-    const event = require(`./events/${folder}/${file}`);
+    const raw = require(`./events/${folder}/${file}`);
+    const source = `${folder}/${file}`;
 
-    if (typeof event === 'function') {
-      // Ancien format : nom = nom du fichier sans extension
+    if (typeof raw === 'function') {
+      // Ancien format fonction
       const eventName = file.replace('.js', '');
-      client.on(eventName, (...args) => event(client, ...args));
-      const count = (registeredEvents.get(eventName) || 0) + 1;
-      registeredEvents.set(eventName, count);
-      console.log(`[EVT] ${eventName} [${folder}/${file}]`);
+      client.on(eventName, (...args) => raw(client, ...args));
+      console.log(`[EVT] ${eventName} [${source}]`);
 
-    } else if (event && event.name && typeof event.execute === 'function') {
-      // Nouveau format objet { name, execute }
-      client.on(event.name, (...args) => event.execute(...args));
-      const label = event.customName || event.name;
-      const count = (registeredEvents.get(event.name) || 0) + 1;
-      registeredEvents.set(event.name, count);
-      console.log(`[EVT] ${event.name} [${folder}/${file}] (${label})`);
+    } else if (Array.isArray(raw)) {
+      // Tableau d'events (ex: guildBan.js)
+      for (const event of raw) registerEvent(event, source);
+
+    } else if (raw && raw.name && typeof raw.execute === 'function') {
+      // Objet simple
+      registerEvent(raw, source);
+
     } else {
-      console.warn(`[EVT WARN] Format inconnu : ${folder}/${file}`);
+      console.warn(`[EVT WARN] Format inconnu : ${source}`);
     }
   }
 }
