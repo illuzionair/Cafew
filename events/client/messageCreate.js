@@ -1,3 +1,5 @@
+const { createFakeInteraction } = require('../../util/prefixBridge');
+
 module.exports = async (client, message) => {
   if (message.author.bot) return;
   if (!message.guild) return;
@@ -11,30 +13,44 @@ module.exports = async (client, message) => {
 
   if (!client.prefixCommands) client.prefixCommands = new Map();
 
-  // Cherche d'abord dans les prefix commands
+  // 1. Cherche dans les prefix commands natives
   let command =
     client.prefixCommands.get(commandName) ||
     [...client.prefixCommands.values()].find(c => c.aliases?.includes(commandName));
 
-  // Fallback : cherche dans les slash commands par nom
+  // 2. Fallback : bridge vers la slash command du même nom
   if (!command) {
     const slashCmd = client.commands?.get(commandName);
     if (slashCmd) {
-      // Wrapper : on cree un faux objet prefix autour de la slash command
-      command = {
-        name: slashCmd.data.name,
-        run: async (client, message, args) => {
-          return message.reply(
-            `\`${prefix}${commandName}\` est une **slash command**.\n` +
-            `Utilise \`/${commandName}\` dans Discord directement.`
-          );
+      // Cooldown
+      if (!client.cooldowns) client.cooldowns = new Map();
+      const now = Date.now();
+      const cooldownKey = `${commandName}_${message.author.id}`;
+      const cooldown = 3000;
+      if (client.cooldowns.has(cooldownKey)) {
+        const expire = client.cooldowns.get(cooldownKey) + cooldown;
+        if (now < expire) {
+          const left = ((expire - now) / 1000).toFixed(1);
+          return message.reply(`⏳ Attends encore **${left}s**.`)
+            .then(m => setTimeout(() => m.delete().catch(() => {}), 4000));
         }
-      };
+      }
+      client.cooldowns.set(cooldownKey, now);
+      setTimeout(() => client.cooldowns.delete(cooldownKey), cooldown);
+
+      try {
+        const fakeInteraction = await createFakeInteraction(message, args, slashCmd);
+        await slashCmd.execute(fakeInteraction);
+      } catch (err) {
+        console.error(`[BRIDGE ERROR] ${commandName}:`, err);
+        message.reply('❌ Une erreur est survenue.').catch(() => {});
+      }
+      return;
     }
+    return; // commande inconnue
   }
 
-  if (!command) return;
-
+  // Prefix command native
   if (!client.cooldowns) client.cooldowns = new Map();
   const now = Date.now();
   const cooldownKey = `${command.name}_${message.author.id}`;
